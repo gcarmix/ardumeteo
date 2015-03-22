@@ -104,12 +104,11 @@ void publishData(const char * sensor_type,int sensor_id,double sensor_value)
 
 void loop() {
 
-	/* -- Insert here the reading routines for you sensors -- */
-	DHT22_Read();
-	/* ------------------------------------------------------ */
-
 	if(time2send == 0)
 	{
+		/* -- Insert here the reading routines for you sensors -- */
+			DHT22_Read();
+		/* ------------------------------------------------------ */
 		Serial.print("Sending message number " + String(count++) + "\r\n");
 		if(client.connect(CLIENT_NAME,ARDUMETEO_USER,MQTT_PASSWORD))
 		{
@@ -120,6 +119,8 @@ void loop() {
 			publishData(TEMPERATURE_S,SENS_0,DHT.temperature);
 			publishData(HUMIDITY_S,SENS_0,DHT.humidity);
 			/* --------------------------------------------------------------- */
+			client.loop();
+			client.disconnect();
 		}
 		else
 		{
@@ -128,11 +129,13 @@ void loop() {
 	}
 	else
 	{
-		Serial.print(time2send);
-		Serial.println(" seconds to next send.");
+		if(time2send % 10 == 0)
+		{
+			Serial.print(time2send);
+			Serial.println(" seconds to next send.");
+		}
 	}
-	 client.loop();
-	 client.disconnect();
+
 	 delay(1000);
 	 time2send--;
 }

@@ -64,12 +64,7 @@ int ESP8266COM::read() {
 			mBufferLine1[readPos]= newByte;
 			readPos++;
 		}
-		/*if( newByte == '>' ){
-			this->callback(this->mReference, mBufferLine1, &readPos );
-			return 1;
-		}*/
-		//delay(10);
-		//mSerialPort->listen();
+
 	}
 
 	return readPos;
