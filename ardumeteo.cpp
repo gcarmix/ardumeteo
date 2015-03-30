@@ -6,7 +6,8 @@
 #include "dht.h"
 #define DHT22_PIN 6
 
-
+SensorsData sensorData;
+uint16_t sensorMask;
 //MQTT Server IP Address
 
 dht DHT;
@@ -92,14 +93,53 @@ void setup() {
   time2send=0;
   Serial.println("End Setup");
 }
-void publishData(const char * sensor_type,int sensor_id,double sensor_value)
+void publishData(SensorsData sensorData,uint16_t sensorMask)
 {
-	char message_str[16];
+	uint16_t i;
+	char message_str[40];
+	char value_str[8];
+	double value_f;
 	char topic_str[32];
-	ftoa(message_str,sensor_value,1);
-	sprintf(topic_str,"ARDUMETEO/%s/%s/%d",ARDUMETEO_USER,sensor_type,sensor_id);
+	if(!sensorMask)
+		return;
+	sprintf(message_str,"");
+	for(i=0x0001;i<0x0100;i=i<<1)
+	{
+		if(sensorMask & i)
+		{
+			switch(i)
+			{
+			case TEMPb:
+				value_f = sensorData.temp;
+				break;
+			case HUMYb:
+				value_f = sensorData.humy;
+				break;
+			case PRESb:
+				value_f = sensorData.pres;
+				break;
+			case WINDb:
+				value_f = sensorData.wind;
+				break;
+			case LUMYb:
+				value_f = sensorData.light;
+			}
+			ftoa(value_str,value_f,1);
+			strcat(message_str,value_str);
+		}
+		else
+			strcat(message_str,"0");
+
+		if(i==0x0080)
+			strcat(message_str,".");
+		else
+			strcat(message_str,",");
+	}
+
+	sprintf(topic_str,"ARDUMETEO/%s/%04X",ARDUMETEO_USER,sensorMask);
+	Serial.println("TOPIC: " + String(topic_str) + "\r\nMESSAGE: " + String(message_str) + "\r\n");
 	client.publish(topic_str,message_str);
-	Serial.println("Message published:\r\nTOPIC: " + String(topic_str) + "\r\nMESSAGE: " + String(message_str) + "\r\n");
+
 }
 
 void loop() {
@@ -108,6 +148,9 @@ void loop() {
 	{
 		/* -- Insert here the reading routines for you sensors -- */
 			DHT22_Read();
+			sensorData.temp = DHT.temperature;
+			sensorData.humy = DHT.humidity;
+			sensorMask = TEMPb | HUMYb;
 		/* ------------------------------------------------------ */
 		Serial.print("Sending message number " + String(count++) + "\r\n");
 		if(client.connect(CLIENT_NAME,ARDUMETEO_USER,MQTT_PASSWORD))
@@ -116,14 +159,16 @@ void loop() {
 			Serial.println("Client Connected");
 
 			/* -- Add here a line for every sensor you have data to publish -- */
-			publishData(TEMPERATURE_S,SENS_0,DHT.temperature);
-			publishData(HUMIDITY_S,SENS_0,DHT.humidity);
+
+			publishData(sensorData,sensorMask);
+
 			/* --------------------------------------------------------------- */
 			client.loop();
 			client.disconnect();
 		}
 		else
 		{
+			time2send = 30; //retrying in 30 seconds
 			Serial.println("Error connecting to server.");
 		}
 	}
